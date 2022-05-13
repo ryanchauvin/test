@@ -1,36 +1,29 @@
-# This is a basic workflow to help you get started with Actions
+name: Image Build and Scan
 
-name: CI
+on: [pull_request]
 
-# Controls when the workflow will run
-on:
-  # Triggers the workflow on push or pull request events but only for the main branch
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-  # Allows you to run this workflow manually from the Actions tab
-  workflow_dispatch:
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
-  build:
-    # The type of runner that the job will run on
+  build-cli:
+    name: build-cli
     runs-on: ubuntu-latest
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+    env: 
+      IMAGE_NAME: ubuntu-latest
+      PROJECT_KEY: default # Set the desired project to run the cli scanning with
+      CLI_VERSION: latest # Orca CLI version
+    
     steps:
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v3
-
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
-
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+    # checks-out your repository under $GITHUB_WORKSPACE, so your workflow can access it.
+    - name: Checkout
+      uses: actions/checkout@v2
+    
+    # Build your docker image, that is going to be scanned in the next step
+    - name: Docker Image Build
+      run: docker build -t $IMAGE_NAME .
+  
+    # Run Orca CLI against the previously created container image
+    - name: Orca CLI - Security Scanning
+      env:
+        ORCA_SECURITY_API_TOKEN: "aHR0cHM6Ly9hcHAudXMub3JjYXNlY3VyaXR5LmlvfHxjQlRiRmpOZW1LSWthMW0wNGNhbXI5Qm5mQ29kOFFOaQ=="
+      run: |
+        set +e
+        docker run -e ORCA_SECURITY_API_TOKEN --rm -v /var/run/docker.sock:/var/run/docker.sock ghcr.io/orcasecurity/orca-cli:${CLI_VERSION} -p ${PROJECT_KEY} image scan ${IMAGE_NAME}
